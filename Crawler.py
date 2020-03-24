@@ -2,6 +2,7 @@
 
 """
 1. removed redundant libraries
+2. changed use of insecure method from urllib
 2. combine functions into class
 """
 
@@ -20,26 +21,37 @@ envydata = []
 
 # 이미지로 저장
 
+def validate_url(url):
+    if url.lower().startswith('http'):
+        return True
+    else:
+        raise ValueError from None
 
-def save_img(filename, imgUrl, retries=3):
+
+def retry(retries):
+    retries -= 1
+    print("Exception raised: Retrying ...")
+    print("Retries left : " + retries)
+
+
+def save_img(filename, img_url, retries=3):
     def _progress(count, block_size, total_size):
-        sys.stderr.write('\r>> Downloading %s %.1f%%' % (
-            imgUrl, float(count * block_size) / float(total_size) * 100.0))
+        sys.stderr.write('\r>> Downloading %s %.1f%%' %
+                         (img_url, float(count * block_size) / float(total_size) * 100.0))
         sys.stderr.flush()
 
     while retries > 0:
-        try:
-            urllib.request.urlretrieve(imgUrl, filename + '.jpg', _progress)
-            break
-        except urllib.error.URLError:  # specified the exception, added retries counter.
-            retries -= 1  # refactored
-            print("Exception raised: Retrying ...")
-            print("Retries left : " + retries)
-            continue
+        if validate_url(img_url):
+            try:
+                urllib.request.urlretrieve(img_url, filename + '.jpg', _progress)
+            except urllib.error.URLError:  # specified the exception, added retries counter.
+                retry(retries)
+                continue
 
 
 def product_detail(no, url):
-    html = urlopen(url).read()
+    if validate_url(url):
+        html = urlopen(url).read()
     soup = BeautifulSoup(html, 'html.parser')
     info = soup.select("meta[property]")
     explain = soup.select_one("#SMS_TD_summary")
@@ -59,9 +71,7 @@ def product_detail(no, url):
     n = 0
     for d in option:
         s = d.get("value")
-        if '*' in s:
-            pass
-        else:
+        if '*' not in s:
             temp.append(s)
             print(s, end="\n")
             n += 1
@@ -85,21 +95,11 @@ def product_detail(no, url):
     envydata.append(temp)
 
 
-def envylook_category(category, page):  # Local variable name hid the variable defined in the outer space.
+def envylook_category(category, page):
     tail_url = f"/product/list2.html?cate_no={category}&page={page}"
     url = base_url + tail_url
-
-    '''
-    urllib not only opens http:// or https:// URLs, but also ftp:// and file://. 
-    with this it might be possible to open local files on the executing machine which might be a security risk 
-    if the URL to open can be manipulated by an external user.
-    '''
-
-    if url.lower().startswith('http'):
+    if validate_url(url):
         html = urlopen(url).read()
-    else:
-        raise ValueError from None
-
     soup = BeautifulSoup(html, 'html.parser')
     info = soup.select(".thumbnail a")
     info2 = soup.find('meta', {'property': 'og:description'})
