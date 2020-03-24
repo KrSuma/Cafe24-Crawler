@@ -1,10 +1,9 @@
 # -*-coding:utf-8
 
-'''
+"""
 1. removed redundant libraries
 2. combine functions into class
-
-'''
+"""
 
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
@@ -22,7 +21,7 @@ envydata = []
 # 이미지로 저장
 
 
-def saveimg(filename, imgUrl, retries=3):
+def save_img(filename, imgUrl, retries=3):
     def _progress(count, block_size, total_size):
         sys.stderr.write('\r>> Downloading %s %.1f%%' % (
             imgUrl, float(count * block_size) / float(total_size) * 100.0))
@@ -32,14 +31,14 @@ def saveimg(filename, imgUrl, retries=3):
         try:
             urllib.request.urlretrieve(imgUrl, filename + '.jpg', _progress)
             break
-        except urllib.UrlError:
-            retries -= 1
+        except urllib.error.URLError:  # specified the exception, added retries counter.
+            retries -= 1  # refactored
             print("Exception raised: Retrying ...")
-            print("Retries left :" + retries)
+            print("Retries left : " + retries)
             continue
 
 
-def productdetail(no, url):
+def product_detail(no, url):
     html = urlopen(url).read()
     soup = BeautifulSoup(html, 'html.parser')
     info = soup.select("meta[property]")
@@ -52,7 +51,7 @@ def productdetail(no, url):
         s = d.get("content")
         temp.append(s)
         if "jpg" in s:
-            saveimg(str(no) + "-" + "title", s)
+            save_img(str(no) + "-" + "title", s)
         print(s, end="\n")
 
     temp.append(explain.text)
@@ -76,19 +75,30 @@ def productdetail(no, url):
         s = d.get("src")
         if '//' in s:
             temp.append(s)
-            saveimg(str(no) + "-" + str(imgfilecount), 'http:' + s)
+            save_img(str(no) + "-" + str(imgfilecount), 'http:' + s)
             print('http:' + s, end="\n")
         else:
             temp.append(baseurl + s)
-            saveimg(str(no) + "-" + str(imgfilecount), baseurl + s)
+            save_img(str(no) + "-" + str(imgfilecount), baseurl + s)
             print(baseurl + s, end="\n")
         imgfilecount += 1
     envydata.append(temp)
 
 
-def envylookcategory(cate_no, page_no):
-    tailurl = f"/product/list2.html?cate_no={cate_no}&page={page_no}"
+def envylook_category(category, page):  # Local variable name hid the variable defined in the outer space.
+    tailurl = f"/product/list2.html?cate_no={category}&page={page}"
     url = baseurl + tailurl
+
+    '''
+    urllib not only opens http:// or https:// URLs, but also ftp:// and file://. 
+    with this it might be possible to open local files on the executing machine which might be a security risk 
+    if the URL to open can be manipulated by an external user.
+    '''
+
+    if url.lower().startswith('http'):
+        req = urllib.Request.request(url)
+    else:
+        raise ValueError from None
 
     html = urlopen(url).read()
     soup = BeautifulSoup(html, 'html.parser')
@@ -96,7 +106,7 @@ def envylookcategory(cate_no, page_no):
     info2 = soup.find('meta', {'property': 'og:description'})
     info3 = soup.find('meta', {'property': 'og:site_name'})
 
-    dirname = info3.get("content") + "_" + info2.get("content") + "_cate" + str(cate_no) + "_page" + str(page_no)
+    dirname = info3.get("content") + "_" + info2.get("content") + "_cate" + str(category) + "_page" + str(page)
     os.mkdir(dirname)
     os.chdir(dirname)
 
@@ -105,7 +115,7 @@ def envylookcategory(cate_no, page_no):
         s = baseurl + d.get("href")
         os.mkdir(str(n))
         os.chdir(str(n))
-        productdetail(n, s)
+        product_detail(n, s)
         os.chdir("..")
         print(str(n) + "번째 " + s, end="\n")
         n += 1
@@ -116,7 +126,7 @@ def envylookcategory(cate_no, page_no):
 cate_no = input("카테고리번호를 입력하세요 : ")
 page_no = input("페이지번호를 입력하세요 : ")
 socket.setdefaulttimeout(30)
-result = envylookcategory(cate_no, page_no)
+result = envylook_category(cate_no, page_no)
 
 csvname = result + ".csv"
 
