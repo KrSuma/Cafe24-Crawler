@@ -24,8 +24,7 @@ envydata = []
 def validate_url(url):
     if url.lower().startswith('http'):
         return True
-    else:
-        raise ValueError from None
+    raise ValueError from None
 
 
 def retry(retries):
